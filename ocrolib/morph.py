@@ -14,12 +14,12 @@ def label(image,**kw):
     work with a wider range of data types.  The default function
     is inconsistent about the data types it accepts on different
     platforms."""
-    try: return measurements.label(image,**kw)
+    try: return np.int64(measurements.label(image,**kw))
     except: pass
     types = ["int32","uint32","int64","unit64","int16","uint16"]
     for t in types:
-	try: return measurements.label(array(image,dtype=t),**kw) 
-	except: pass
+        try: return measurements.label(array(image,dtype=t),**kw)
+        except: pass
     # let it raise the same exception as before
     return measurements.label(image,**kw)
 
@@ -33,8 +33,8 @@ def find_objects(image,**kw):
     except: pass
     types = ["int32","uint32","int64","unit64","int16","uint16"]
     for t in types:
-	try: return measurements.find_objects(array(image,dtype=t),**kw) 
-	except: pass
+        try: return measurements.find_objects(array(image,dtype=t),**kw)
+        except: pass
     # let it raise the same exception as before
     return measurements.find_objects(image,**kw)
     
@@ -162,6 +162,7 @@ def propagate_labels_simple(regions,labels):
     """Given an image and a set of labels, apply the labels
     to all the regions in the image that overlap a label."""
     rlabels,_ = label(regions)
+    rlabels = np.int64(rlabels)
     cors = correspondences(rlabels,labels)
     outputs = zeros(amax(rlabels)+1,'i')
     for o,i in cors.T: outputs[o] = i
@@ -174,6 +175,7 @@ def propagate_labels(image,labels,conflict=0):
     to all the regions in the image that overlap a label.
     Assign the value `conflict` to any labels that have a conflict."""
     rlabels,_ = label(image)
+    rlabels = np.int64(rlabels)
     cors = correspondences(rlabels,labels)
     outputs = zeros(amax(rlabels)+1,'i')
     oops = -(1<<30)

@@ -312,6 +312,7 @@ def compute_segmentation(binary,scale):
     if not args.quiet: print_info("computing lines")
     bottom,top,boxmap = compute_gradmaps(binary,scale)
     seeds = compute_line_seeds(binary,bottom,top,colseps,scale)
+    seeds = np.int64(seeds)
     DSAVE("seeds",[bottom,top,boxmap])
 
     # spread the text line seeds to all the remaining
@@ -322,6 +323,7 @@ def compute_segmentation(binary,scale):
     spread = morph.spread_labels(seeds,maxdist=scale)
     llabels = where(llabels>0,llabels,spread*binary)
     segmentation = llabels*binary
+    segmentation = np.int64(segmentation)
     return segmentation
 
 
