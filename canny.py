@@ -234,7 +234,7 @@ def processImage(blur, lowthreshold=200, highThreshold=450, tag=''):
     cv2.imwrite('edges1%s.png' % tag,edges)
     return edges
 
-def splitImage(edges, blur, tag=''):
+def splitImage(edges, blur, tag='',margin=4):
     h_projection = hprojection(edges)
     v_projection = vprojection(edges)
     top, bottom = cropProjection(h_projection)
@@ -254,12 +254,12 @@ def splitImage(edges, blur, tag=''):
         left, leftEnd = region
         if (leftEnd - left) > 220 and (leftEnd-left) < 300:
             width = (leftEnd - left)/2
-            cr_img =cv2.getRectSubPix(blur, (width+4, bottom-top+4), (width/2+left, (top+bottom)/2))
+            cr_img =cv2.getRectSubPix(blur, (width+margin, bottom-top+margin), (width/2+left, (top+bottom)/2))
             cv2.imwrite('crop%s%d.png' % (tag, left), cr_img)
-            cr_img =cv2.getRectSubPix(blur, (width+4, bottom-top+4), (leftEnd-(width/2), (top+bottom)/2))
+            cr_img =cv2.getRectSubPix(blur, (width+margin, bottom-top+margin), (leftEnd-(width/2), (top+bottom)/2))
             cv2.imwrite('crop%s%d.png' % (tag, left+width), cr_img)
         else:
-            cr_img =cv2.getRectSubPix(blur, (leftEnd-left+4, bottom-top+4), ((leftEnd+left)/2, (top+bottom)/2))
+            cr_img =cv2.getRectSubPix(blur, (leftEnd-left+margin, bottom-top+margin), ((leftEnd+left)/2, (top+bottom)/2))
             cv2.imwrite('crop%s%d.png' % (tag, left), cr_img)
     return regions,left, right,top,bottom
 
@@ -416,10 +416,12 @@ def combineBoxmap(binary):
     order = zeros((len(bysize),len(bysize)),'B')
     for i,u in enumerate(bysize):
         #y1,y2,x1,x2
-        print u,u[0].start,u[0].stop,u[1].start, u[1].stop
+        #print u,u[0].start,u[0].stop,u[1].start, u[1].stop
         #binary[u]=0
-        cv2.line(binary,(u[0].start,u[0].stop),(u[1].start, u[1].stop),(0,0,0),2)
-        break
+#        M=cv2.moments(u)
+#        x = int(M['m10']/M['m00'])
+#        y = int(M['m01']/M['m00'])
+        cv2.line(binary,(u[1].start, u[0].start),(u[1].stop,u[0].stop),(0,0,0),2)
         for j,v in enumerate(bysize):
             if x_overlaps(u,v):
                 if above(u,v):
@@ -440,12 +442,11 @@ def processOneLineImage(gray_img, iTag):
     cv2.drawContours(edges,contours,-1,(255,255,255),1)
     cv2.imwrite('edges%s.png' % iTag,edges)
     boxmap = psegutils.compute_boxmap(img,scale,threshold=(.4,10),dtype='B')
-    
-    combineBoxmap(boxmap)
+    #combineBoxmap(boxmap)
     cv2.imwrite('box%s.png' % iTag, boxmap*255)
     h_projection = hprojection(boxmap*255)
     top, bottom = cropProjection(h_projection)
-    regions = splitProjection(h_projection, top, bottom,60,2)
+    regions = splitProjection(h_projection, top, bottom,30,2)
     print iTag, top,bottom
     #print regions
     #print v_projection[1270:1450]
@@ -462,7 +463,7 @@ def processOnePageImage(gray_img, iTag):
     (_, img) = cv2.threshold(gray_img, 110, 255, cv2.THRESH_BINARY_INV)
     scale = psegutils.estimate_scale(img)
     binary = remove_hlines(img, gray_img, scale)
-    binary = remove_vlines(img, gray_img, scale)
+    #binary = remove_vlines(img, gray_img, scale)
     img_crop = interpolation.rotate(gray_img,90)
     angle = estimate_angle(img_crop)
     print iTag,angle
@@ -473,7 +474,7 @@ def processOnePageImage(gray_img, iTag):
     cv2.imwrite('crop%s.png' % iTag, img_crop)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
     closed = cv2.dilate(img_crop, kernel, iterations = 1)
-    edges = processImage(closed, 50, 300, tag=iTag)
+    edges = processImage(closed, 60, 250, tag=iTag)
     splitImage(edges, img_crop, iTag)
 
 if len(sys.argv) < 3:
