@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import sys
 import cv2
-import cv
+from cv import *
 import random
 import numpy as np
 from scipy import ndimage
@@ -44,22 +44,32 @@ def find_border_components(contours, ary):
     return borders
 
 def vprojection(img):
-    height, width = img.shape
-    projection = np.zeros(width)
-    for x in range(0, width):
-        for y in range(0, height):
-            if img[y][x] > 0:
-                projection[x] += 1
+#    height, width = img.shape
+#    projection = np.zeros(width)
+#    for x in range(0, width):
+#        for y in range(0, height):
+#            if img[y,x] > 0:
+#                print img[y,x]
+#                projection[x] += 1
+    projection = np.sum(img, axis=0)/255
     return projection
 
 def hprojection(img):
-    height, width = img.shape
-    projection = np.zeros(height)
-    
-    for y in range(0, height):
-        for x in range(0, width):
-            if img[y][x] > 0:
-                projection[y] += 1
+#    height, width = img.shape
+#    projection = np.zeros(height)
+#    
+#    for y in range(0, height):
+#        for x in range(0, width):
+#            if img[y,x] > 0:
+#                print img[y,x]
+#                projection[y] += 1
+    projection = np.sum(img, axis=1)/255
+#    for i in range(0, height):
+#        if projection[i] != projection1[i]:
+#            print "error",i,projection[i],projection1[i]
+#            for x in range(0, width):
+#                print img[i,x],img[i][x]
+#            exit(1)
     return projection
 
 def cropProjection(projection, threshold = 0):
@@ -108,14 +118,14 @@ def findMiddleRegion(projection, min, max):
         ret.append((start+1, max))
     return ret
 
-def findMiddleRegion(regions, center):
+def findMiddleRegion(regions, center, minDistance=30):
     ret = []
     lastEnd = -1
     for region in regions:
         if lastEnd == -1:
             lastEnd = region[1]
         else:
-            if (region[0] - lastEnd) >= 30:
+            if (region[0] - lastEnd) >= minDistance:
                 ret.append((lastEnd, region[0]))
             lastEnd = region[1]
     min = 100000
@@ -165,8 +175,16 @@ def cropImage(edges, blur):
 def processImage(blur, lowthreshold=200, highThreshold=450, tag=''):
     edges = cv2.Canny(blur,lowthreshold,highThreshold)
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(edges,contours,-1,(255,255,255),1)
+    cv2.drawContours(edges,contours,-1,(255,255,255),-1)
     cv2.imwrite('edges%s.png' % tag,edges)
+#    (_, img) = cv2.threshold(edges, 110, 255, cv2.THRESH_BINARY)
+#    cv2.imwrite('edges3%s.png' % tag,img)
+#    scale = psegutils.estimate_scale(img)
+#    binary = remove_hlines(img, blur, scale)
+#    cv2.imwrite('edges4%s.png' % tag,binary*255)
+#    binary = remove_vlines(binary, blur, scale)
+#    edges=binary*255
+#    cv2.imwrite('edges2%s.png' % tag,edges)
 
 #    minLineLength = 70
 #    maxLineGap = 50
@@ -326,8 +344,9 @@ def remove_vlines(binary,gray,scale,maxsize=10):
     labels,_ = morph.label(binary)
     objects = morph.find_objects(labels)
     for i,b in enumerate(objects):
-        if sl.height(b)>maxsize*scale:
+        if (sl.width(b)<=20 and sl.height(b)>200) or (sl.width(b)<=45 and sl.height(b)>500):
             gray[b][labels[b]==i+1] = 140
+            gray[:,b[1].start:b[1].stop]=140
             labels[b][labels[b]==i+1] = 0
     return array(labels!=0, 'B')
 
@@ -354,6 +373,81 @@ def read_image_gray(a,pageno=0):
     if a.ndim==3:
         a = mean(a,2)
     return a
+
+def dftSkew(srcImg):
+    rows,cols = srcImg.shape
+    opWidth = cv2.getOptimalDFTSize(rows);
+    opHeight = cv2.getOptimalDFTSize(cols);
+    padded=cv2.copyMakeBorder(srcImg, 0, opWidth-rows, 0, opHeight-cols, cv2.BORDER_CONSTANT, value=0);
+    
+    dft = cv2.dft(np.float32(padded),flags = cv2.DFT_COMPLEX_OUTPUT)
+    min_value =  np.min(dft)
+    shift_mat = np.fft.fftshift(dft)
+
+    
+    magMat= 20*cv2.log(1 + cv2.magnitude(shift_mat[:,:,0], shift_mat[:,:,1]))
+    cv2.normalize(magMat, magMat, 0, 255, cv2.NORM_MINMAX)
+    magMat= np.uint8(np.around(magMat))
+    cv2.imwrite('dft.png', magMat)
+    #    //imwrite("imageText_mag.jpg",magImg);
+
+#    //Turn into binary image
+    (_, magImg)=cv2.threshold(magMat,150,255,cv2.THRESH_BINARY);
+    cv2.imwrite('dft1.png', magImg)
+#    //imwrite("imageText_bin.jpg",magImg);
+
+#    //Find lines with Hough Transformation
+    pi180 = np.pi/180;
+    linImg = np.zeros(magImg.shape)
+    lines = cv2.HoughLines(magImg,1,pi180,100,0,0);
+    print lines
+    for line in lines[0]:
+        rho = line[0]
+        theta = line[1];
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a*rho
+        y0 = b*rho
+        pt1 =(int(x0 + 1000*(-b)),int(y0 + 1000*(a)))
+        pt2 = (int(x0 - 1000*(-b)),int(y0 - 1000*(a)))
+        cv2.line(linImg,pt1,pt2,(255),1);
+    cv2.imwrite("dlines.png",linImg);
+#    //imwrite("imageText_line.jpg",linImg);
+#    if(lines.size() == 3){
+#        cout << "found three angels:" << endl;
+#            cout << lines[0][1]*180/CV_PI << endl << lines[1][1]*180/CV_PI << endl << lines[2][1]*180/CV_PI << endl << endl;
+#    }
+
+#    //Find the proper angel from the three found angels
+    angel=0;
+    piThresh = np.pi/90;
+    pi2 = np.pi/2;
+    for line in lines[0]:
+        theta = line[1];
+        if abs(theta) < piThresh or abs(theta-pi2) < piThresh:
+            continue;
+        else:
+            angel = theta;
+            break;
+    
+#    //Calculate the rotation angel
+#    //The image has to be square,
+#    //so that the rotation angel can be calculate right
+    if angel<pi2:
+        angel=angel
+    else:
+        angel = angel-np.pi
+
+    if angel != pi2:
+        angelT = rows*tan(angel)/cols;
+        angel = np.arctan(angelT);
+    angelD = angel*180/np.pi;
+
+
+    #Rotate the image to recover
+    rotMat = cv2.getRotationMatrix2D((cols/2, rows/2),angelD,1.0);
+    dstImg = cv2.warpAffine(srcImg,rotMat,(cols,rows));
+    cv2.imwrite("dresult.png",dstImg);
 
 def estimate_skew_angle(image,angles):
     estimates = []
@@ -461,9 +555,12 @@ def processOneLineImage(gray_img, iTag):
 
 def processOnePageImage(gray_img, iTag):
     (_, img) = cv2.threshold(gray_img, 110, 255, cv2.THRESH_BINARY_INV)
+    cv2.imwrite('crop1%s.png' % iTag, img)
     scale = psegutils.estimate_scale(img)
     binary = remove_hlines(img, gray_img, scale)
-    #binary = remove_vlines(img, gray_img, scale)
+    binary = remove_vlines(binary, gray_img, scale)
+    cv2.imwrite('crop2%s.png' % iTag, binary*255)
+    dftSkew(gray_img)
     img_crop = interpolation.rotate(gray_img,90)
     angle = estimate_angle(img_crop)
     print iTag,angle
@@ -474,7 +571,7 @@ def processOnePageImage(gray_img, iTag):
     cv2.imwrite('crop%s.png' % iTag, img_crop)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
     closed = cv2.dilate(img_crop, kernel, iterations = 1)
-    edges = processImage(closed, 60, 250, tag=iTag)
+    edges = processImage(closed, 50, 150, tag=iTag)
     splitImage(edges, img_crop, iTag)
 
 if len(sys.argv) < 3:
@@ -566,24 +663,37 @@ if len(sys.argv) > 3 and len(sys.argv[3]) > 0:
     processOnePageImage(gray, sys.argv[3])
     exit(1)
 
-blur = cv2.GaussianBlur(gray,(3,3),0)
-cv2.imwrite('blur.png', blur)
-kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
-closed = cv2.dilate(blur, kernel, iterations = 1)
-cv2.imwrite('closed.png', closed)
+def processTwoPageImage():
+    blur = cv2.GaussianBlur(gray,(3,3),0)
+    cv2.imwrite('blur.png', blur)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+    closed = cv2.dilate(blur, kernel, iterations = 1)
+    cv2.imwrite('closed.png', closed)
 
-#(_, img2) = cv2.threshold(blur, 64, 255, cv2.THRESH_BINARY_INV)
-edges = processImage(closed, 100, 300)
-regions,left, right,top,bottom = splitImage(edges, blur)
+    #(_, img2) = cv2.threshold(blur, 64, 255, cv2.THRESH_BINARY_INV)
+    edges = processImage(closed, 60, 250)
+    regions,left, right,top,bottom = splitImage(edges, blur)
 
 
-height, width = edges.shape
-left = regions[0][0]
-right = regions[-1][1]
-leftEnd, rightStart = findMiddleRegion(regions, width /2)
+    height, width = edges.shape
+    left = regions[0][0]
+    right = regions[-1][1]
+    if right <= width/2:
+        leftEnd = right
+        right = -1
+    elif left>=width/2:
+        rightStart = left
+        left = -1
+    else:
+        leftEnd, rightStart = findMiddleRegion(regions, width /2)
 
-img_crop=cv2.getRectSubPix(gray, (leftEnd-left+4, bottom-top+4), ((leftEnd+left)/2, (top+bottom)/2))
-processOnePageImage(img_crop, 'left')
+    margin=12
+    if left > -1:
+        img_crop=cv2.getRectSubPix(gray, (leftEnd-left+margin, bottom-top), ((leftEnd+left)/2, (top+bottom)/2))
+        processOnePageImage(img_crop, 'left')
 
-img_crop=cv2.getRectSubPix(gray, (right-rightStart+4, bottom-top+4), ((right+rightStart)/2, (top+bottom)/2))
-processOnePageImage(img_crop, 'right')
+    if right > -1:
+        img_crop=cv2.getRectSubPix(gray, (right-rightStart+margin, bottom-top), ((right+rightStart)/2, (top+bottom)/2))
+        processOnePageImage(img_crop, 'right')
+
+processTwoPageImage()

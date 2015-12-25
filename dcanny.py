@@ -28,7 +28,7 @@ def CannyMaxThreshold(maxThreshold):
 ratio = 3
 kernel_size = 3
 
-img = cv2.imread('jusongguangyun0001-1.png')
+img = cv2.imread('jusongguangyun1-1.png')
 gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 cv2.namedWindow('canny demo', cv.CV_WINDOW_AUTOSIZE)
