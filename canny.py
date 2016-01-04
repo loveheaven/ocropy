@@ -17,6 +17,8 @@ from multiprocessing import Pool
 import ocrolib
 from ocrolib import psegutils,morph,sl
 from ocrolib.toplevel import *
+import os
+import os.path
 
 def caculateRect(box):
     left = -1
@@ -121,6 +123,7 @@ def findMiddleRegion(projection, min, max):
 def findMiddleRegion(regions, center, minDistance=30):
     ret = []
     lastEnd = -1
+    #this loop is to find all the gaps of which distance is more than 30
     for region in regions:
         if lastEnd == -1:
             lastEnd = region[1]
@@ -129,7 +132,8 @@ def findMiddleRegion(regions, center, minDistance=30):
                 ret.append((lastEnd, region[0]))
             lastEnd = region[1]
     min = 100000
-    result = ()
+    result = (-1,-1)
+    #this loop is to find the closest gap with center
     for region in ret:
         if abs(region[0] - center) < min:
             min = abs(region[0] - center)
@@ -273,12 +277,12 @@ def splitImage(edges, blur, tag='',margin=4):
         if (leftEnd - left) > 220 and (leftEnd-left) < 300:
             width = (leftEnd - left)/2
             cr_img =cv2.getRectSubPix(blur, (width+margin, bottom-top+margin), (width/2+left, (top+bottom)/2))
-            cv2.imwrite('crop%s%d.png' % (tag, left), cr_img)
+            cv2.imwrite('crop%s-%d.png' % (tag, left), cr_img)
             cr_img =cv2.getRectSubPix(blur, (width+margin, bottom-top+margin), (leftEnd-(width/2), (top+bottom)/2))
-            cv2.imwrite('crop%s%d.png' % (tag, left+width), cr_img)
+            cv2.imwrite('crop%s-%d.png' % (tag, left+width), cr_img)
         else:
             cr_img =cv2.getRectSubPix(blur, (leftEnd-left+margin, bottom-top+margin), ((leftEnd+left)/2, (top+bottom)/2))
-            cv2.imwrite('crop%s%d.png' % (tag, left), cr_img)
+            cv2.imwrite('crop%s-%d.png' % (tag, left), cr_img)
     return regions,left, right,top,bottom
 
 def isPixelBlack(pixel):
@@ -346,7 +350,7 @@ def remove_vlines(binary,gray,scale,maxsize=10):
     for i,b in enumerate(objects):
         if (sl.width(b)<=20 and sl.height(b)>200) or (sl.width(b)<=45 and sl.height(b)>500):
             gray[b][labels[b]==i+1] = 140
-            gray[:,b[1].start:b[1].stop]=140
+            #gray[:,b[1].start:b[1].stop]=140
             labels[b][labels[b]==i+1] = 0
     return array(labels!=0, 'B')
 
@@ -605,14 +609,14 @@ def processOneLineImage(gray_img, iTag):
     edges = cv2.Canny(closed,60,300)
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(edges,contours,-1,(255,255,255),1)
-    cv2.imwrite('edges%s.png' % iTag,edges)
+    #cv2.imwrite('edges%s.png' % iTag,edges)
     boxmap = psegutils.compute_boxmap(img,scale,threshold=(.4,10),dtype='B')
     #combineBoxmap(boxmap)
     cv2.imwrite('box%s.png' % iTag, boxmap*255)
     h_projection = hprojection(boxmap*255)
     top, bottom = cropProjection(h_projection)
     regions = splitProjection(h_projection, top, bottom,30,2)
-    print iTag, top,bottom
+    #print iTag, top,bottom
     #print regions
     #print v_projection[1270:1450]
     if len(iTag) == 0:
@@ -620,26 +624,63 @@ def processOneLineImage(gray_img, iTag):
     for region in regions:
         topStart, TopEnd = region
         cr_img =cv2.getRectSubPix(gray_img, (gray_img.shape[1]-4, TopEnd-topStart+8), (gray_img.shape[1]/2, (TopEnd+topStart)/2))
-        cv2.imwrite('%s-%d.png' % (iTag, topStart), cr_img)
+        cv2.imwrite('%sx%d.png' % (iTag, topStart), cr_img)
     return regions,top,bottom
 
 
-def processOnePageImage(gray_img, iTag):
+def processOnePageImage(gray_img, iTag, rotationAngel=0):
     (_, img) = cv2.threshold(gray_img, 110, 255, cv2.THRESH_BINARY_INV)
-    cv2.imwrite('crop1%s.png' % iTag, img)
+    #cv2.imwrite('crop1%s.png' % iTag, img)
     scale = psegutils.estimate_scale(img)
     binary = remove_hlines(img, gray_img, scale)
     binary = remove_vlines(binary, gray_img, scale)
-    cv2.imwrite('crop2%s.png' % iTag, binary*255)
-    dftSkew(gray_img)
-    img_crop = interpolation.rotate(gray_img,90)
-    angle = estimate_angle(img_crop)
-    print iTag,angle
-#    binary = interpolation.rotate(binary,90+angle)
-#    boxmap = psegutils.compute_boxmap(binary,scale,dtype='B')
-#    cv2.imwrite('box%s.png' % iTag, boxmap*255)
-    img_crop = interpolation.rotate(img_crop,angle-90, cval=140)
-    cv2.imwrite('crop%s.png' % iTag, img_crop)
+    #cv2.imwrite('crop2%s.png' % iTag, binary*255)
+    #dftSkew(gray_img)
+    if rotationAngel == 0:
+        img_crop = interpolation.rotate(gray_img,90)
+        angle = estimate_angle(img_crop)
+        print iTag,angle
+    #    binary = interpolation.rotate(binary,90+angle)
+    #    boxmap = psegutils.compute_boxmap(binary,scale,dtype='B')
+    #    cv2.imwrite('box%s.png' % iTag, boxmap*255)
+        img_crop = interpolation.rotate(img_crop,angle-90, cval=140)
+        cv2.imwrite('crop%s.png' % iTag, img_crop)
+    elif rotationAngel == -10:
+        print "start"
+        maxSplit = 0
+        minIndex = 20
+        for i in range(6):
+            img_crop = interpolation.rotate(gray_img,i*0.1,cval=140)
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+            closed = cv2.dilate(img_crop, kernel, iterations = 1)
+            edges = processImage(closed, 50, 150, tag=iTag)
+            regions,left, right,top,bottom = splitImage(edges, img_crop)
+            print len(regions),i
+            if len(regions) > maxSplit:
+                maxSplit = len(regions)
+                minIndex = i
+
+        for i in range(5):
+            img_crop = interpolation.rotate(gray_img,(i+1)*-0.1,cval=140)
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+            closed = cv2.dilate(img_crop, kernel, iterations = 1)
+            edges = processImage(closed, 50, 150, tag=iTag)
+            regions,left, right,top,bottom = splitImage(edges, img_crop)
+            print len(regions), (i+1)*-1
+            if len(regions) > maxSplit:
+                maxSplit = len(regions)
+                minIndex = -1*(i+1)
+        print "angle is: %d" % minIndex
+        if minIndex == 0:
+            return
+        img_crop = interpolation.rotate(gray_img,minIndex*0.1,cval=140)
+#cv2.imwrite('crop%s.png' % iTag, img_crop)
+    else:
+        if rotationAngel != 0.01:
+            img_crop = interpolation.rotate(gray_img,rotationAngel,cval=140)
+            cv2.imwrite('crop%s.png' % iTag, img_crop)
+        else:
+            img_crop = gray_img
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
     closed = cv2.dilate(img_crop, kernel, iterations = 1)
     edges = processImage(closed, 50, 150, tag=iTag)
@@ -723,19 +764,57 @@ if sys.argv[1] == "combine":
     img2 = cv2.imread(sys.argv[3])
     img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
     img3=np.hstack((img1, img2[:,2:]))
-    cv2.imwrite('combine.png', img3)
+    cv2.imwrite(sys.argv[2], img3)
+    os.remove(sys.argv[3])
+    exit(1)
+
+if sys.argv[1] == "crop":
+    img1 = cv2.imread(sys.argv[2])
+    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    endPos=int(sys.argv[3])
+    if len(sys.argv) ==5:
+        startPos = int(sys.argv[4])
+        cv2.imwrite(sys.argv[2][0:sys.argv[2].rfind('.')]+'-'+str(endPos+2)+'.png', img1[:,endPos:startPos])
+        exit(1)
+    cv2.imwrite(sys.argv[2], img1[:,0:endPos])
+    index = sys.argv[2].rfind('-')
+    endIndex = sys.argv[2].rfind('.')
+    fileExtension = sys.argv[2][endIndex:]
+    pos = int(sys.argv[2][index+1:endIndex])+endPos
+    newfile = sys.argv[2][:index+1]+str(pos+2)+fileExtension
+    cv2.imwrite(newfile, img1[:,endPos:])
     exit(1)
 
 if sys.argv[1] == "splitLine":
-    processOneLineImage(gray, os.path.basename(sys.argv[2]))
+    filename = os.path.basename(sys.argv[2])
+    endIndex = filename.rfind('.')
+    tag = filename[:endIndex]
+    processOneLineImage(gray, tag)
     exit(1)
 
 if sys.argv[1] == "dft":
     dftSkew(gray)
     exit(1)
 
+if sys.argv[1] == "path":
+    for parent,dirnames,filenames in os.walk("/Users/baidu/Documents/sourcecode/ocropy"):
+        for filename in filenames:
+            oldName= os.path.join(parent,filename)
+#            if oldName.find("crop") > -1:
+#                newName=oldName.replace("right","right-").replace("left","left-")
+#                os.rename(oldName, newName)
+            if filename == "cropleft-.png" or filename == "cropright-.png":
+                print filename
+                newName=oldName.replace("right-","right").replace("left-","left")
+                os.rename(oldName, newName)
+
+    exit(1)
+
 if len(sys.argv) > 3 and len(sys.argv[3]) > 0:
-    processOnePageImage(gray, sys.argv[3])
+    rotationAngel = 0
+    if len(sys.argv)>4:
+        rotationAngel = float(sys.argv[4])
+    processOnePageImage(gray, sys.argv[3],rotationAngel)
     exit(1)
 
 def processTwoPageImage():
@@ -761,6 +840,8 @@ def processTwoPageImage():
         left = -1
     else:
         leftEnd, rightStart = findMiddleRegion(regions, width /2)
+        if leftEnd == -1 and rightStart == -1:
+            leftEnd, rightStart = findMiddleRegion(regions, width /2, 15)
 
     margin=12
     if left > -1:
