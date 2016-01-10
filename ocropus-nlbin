@@ -127,7 +127,6 @@ def process1(job):
 
     # check whether the image is already effectively binarized
     if args.gray:
-    	print "fasdfasdf"
         extreme = 0
     else:
         extreme = (sum(image<0.05)+sum(image>0.95))*1.0/prod(image.shape)
@@ -159,14 +158,12 @@ def process1(job):
         est = flat[o0:d0-o0,o1:d1-o1]
         ma = args.maxskew
         ms = int(2*args.maxskew*args.skewsteps)
-        print args.zoom,args.range,args.perc,ma,ms
         ocrolib.write_image_gray("est.nrm.png",est)
         angle = estimate_skew_angle(est,linspace(-ma,ma,ms+1))
         flat = interpolation.rotate(flat,angle,mode='constant',reshape=0)
         flat = amax(flat)-flat
     else:
         angle = 0
-    print angle
 
     # estimate low and high thresholds
     if args.parallel<2: print_info("estimating thresholds")

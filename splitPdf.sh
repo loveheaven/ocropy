@@ -80,8 +80,21 @@ function checkPage()
         do
             count=`ls ${file/.png/-*} 2>/dev/null|wc -l`
             w=`identify -format %w $file`
-            if [ $count -eq 0 ] && [ $w -lt 70 ];then
-            echo "$1-$2 $file is wider $w"
+            result=$(echo $file | grep "x")
+            if [ $count -eq 0 ] && [ $w -lt 80 ];then
+                echo "$1-$2 $file is wider $w"
+                if [[ "$result" != "" ]]
+                then
+                    rm -rf $file
+                fi
+            fi
+            if [[ "$result" != "" ]]
+            then
+            h=`identify -format %h $file`
+            if [ $count -eq 0 ] && [ $h -lt 80 ]; then
+            echo "$1-$2 $file deleted"
+            rm -rf $file
+            fi
             fi
         done;
         count=`ls cropleft*.png|wc -l`
@@ -105,8 +118,21 @@ function checkPage()
         do
             count=`ls ${file/.png/-*} 2>/dev/null|wc -l`
             w=`identify -format %w $file`
-            if [ $count -eq 0 ] && [ $w -lt 70 ]; then
+            result=$(echo $file | grep "x")
+            if [ $count -eq 0 ] && [ $w -lt 80 ]; then
                 echo "$1-$2 $file is wider $w"
+                if [[ "$result" != "" ]]
+                then
+                rm -rf $file
+                fi
+            fi
+            if [[ "$result" != "" ]]
+            then
+            h=`identify -format %h $file`
+            if [ $count -eq 0 ] && [ $h -lt 80 ]; then
+            echo "$1-$2 $file deleted"
+            rm -rf $file
+            fi
             fi
         done;
 

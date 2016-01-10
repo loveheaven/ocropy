@@ -785,6 +785,23 @@ if sys.argv[1] == "crop":
     cv2.imwrite(newfile, img1[:,endPos:])
     exit(1)
 
+if sys.argv[1] == "cropV":
+    img1 = cv2.imread(sys.argv[2])
+    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    endPos=int(sys.argv[3])
+    if len(sys.argv) ==5:
+        startPos = int(sys.argv[4])
+        cv2.imwrite(sys.argv[2][0:sys.argv[2].rfind('.')]+'x'+str(endPos+4)+'.png', img1[endPos:startPos, 2:])
+        exit(1)
+#    cv2.imwrite(sys.argv[2], img1[:,0:endPos])
+#    index = sys.argv[2].rfind('-')
+#    endIndex = sys.argv[2].rfind('.')
+#    fileExtension = sys.argv[2][endIndex:]
+#    pos = int(sys.argv[2][index+1:endIndex])+endPos
+#    newfile = sys.argv[2][:index+1]+str(pos+2)+fileExtension
+#    cv2.imwrite(newfile, img1[:,endPos:])
+    exit(1)
+
 if sys.argv[1] == "splitLine":
     filename = os.path.basename(sys.argv[2])
     endIndex = filename.rfind('.')
