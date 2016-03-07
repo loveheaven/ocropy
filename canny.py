@@ -758,6 +758,9 @@ cv2.imwrite('gray.png', gray)
 #plt.title('Sobel Y'), plt.xticks([]), plt.yticks([])
 #plt.show()
 
+#combine two neighbored image to one
+#two params: 1. the left image file path 2. the right image file path
+#return: the image with the left image file path
 if sys.argv[1] == "combine":
     img1 = cv2.imread(sys.argv[2])
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
@@ -768,6 +771,11 @@ if sys.argv[1] == "combine":
     os.remove(sys.argv[3])
     exit(1)
 
+#split the file vertically
+#two params: 1. the image to be splitted 2. the position to split
+#return: two image file-- the first is the image with the width equal to the position. the second is the image next to the first image
+#three params: 1. the image to be splitted 2. the start position to split 3. the end position to split
+#return: one image file: the image with the width between the start position and the end position
 if sys.argv[1] == "crop":
     img1 = cv2.imread(sys.argv[2])
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
@@ -785,6 +793,11 @@ if sys.argv[1] == "crop":
     cv2.imwrite(newfile, img1[:,endPos:])
     exit(1)
 
+#split the file horizontally
+#two params: 1. the image to be splitted 2. the position to split
+#return: two image file-- the first is the image with the width equal to the position. the second is the image next to the first image
+#three params: 1. the image to be splitted 2. the start position to split 3. the end position to split
+#return: one image file: the image with the width between the start position and the end position
 if sys.argv[1] == "cropV":
     img1 = cv2.imread(sys.argv[2])
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)

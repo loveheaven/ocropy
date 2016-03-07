@@ -374,6 +374,10 @@ else
     splitOnePage "jusongguangyun4" 8 right-302 -0.1
     ./canny.py crop jusongguangyun4-9/cropright-1.png 143
     ./canny.py crop jusongguangyun4-9/cropright-146.png 143
+    ./canny.py combine jusongguangyun4-11/cropleft-1477.png jusongguangyun4-11/cropleft-1610.png
+    ./canny.py crop jusongguangyun4-11/cropleft-1477.png 67
+    ./canny.py crop jusongguangyun4-11/cropleft-1546.png 143
+    rm -rf jusongguangyun4-11/cropleft-1691.png
     splitOnePage "jusongguangyun4" 12 left -0.2
     splitOnePage "jusongguangyun4" 12 left-40 0.5
     splitOnePage "jusongguangyun4" 13 right-1288 -0.3
